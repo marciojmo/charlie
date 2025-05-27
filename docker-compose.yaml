@@ -1,0 +1,116 @@
+services:
+  evolution:
+    container_name: evolution_api
+    image: atendai/evolution-api:latest
+    restart: always
+    depends_on:
+      - redis
+      - postgres
+    ports:
+      - 8080:8080
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - evolution-net
+    env_file:
+      - .env.evolution
+    expose:
+      - 8080
+
+  redis:
+    image: redis:latest
+    networks:
+      - evolution-net
+    container_name: redis
+    command: >
+      redis-server --port 6379 --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    ports:
+      - 6379:6379
+
+  postgres:
+    container_name: postgres
+    image: postgres:15
+    networks:
+      - evolution-net
+    command: [ "postgres", "-c", "max_connections=1000", "-c", "listen_addresses=*" ]
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=charlie
+      - POSTGRES_PASSWORD=charlie
+      - POSTGRES_DB=evolution
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - 5432
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    networks:
+      - internal-services
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=charlie
+      - RABBITMQ_DEFAULT_PASS=charlie
+
+  webhook:
+    build: ./webhook
+    networks:
+      - internal-services
+    ports:
+      - "8000:8000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=charlie
+      - RABBITMQ_PASS=charlie
+      - RABBITMQ_INCOMING_MESSAGES_QUEUE=incoming_messages
+    expose:
+      - 8000
+
+  intent-parser:
+    build: ./intent-parser
+    networks:
+      - internal-services
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=charlie
+      - RABBITMQ_PASS=charlie
+      - RABBITMQ_INCOMING_MESSAGES_QUEUE=incoming_messages
+      - RABBITMQ_OUTGOING_MESSAGES_QUEUE=outgoing_messagess
+
+  dispatcher:
+    build: ./dispatcher
+    networks:
+      - internal-services
+      - evolution-net
+    environment:
+      - EVOLUTION_SERVICE_ENDPOINT=http://evolution:8080
+      - INSTANCE_NAME=Charlie
+      - API_KEY=9F1AC345B7C0-42DD-B5EC-39DD027ACF2B
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=charlie
+      - RABBITMQ_PASS=charlie
+      - RABBITMQ_OUTGOING_MESSAGES_QUEUE=outgoing_messagess
+
+volumes:
+  evolution_instances:
+  evolution_redis:
+  postgres_data:
+
+
+networks:
+  evolution-net:
+    name: evolution-net
+    driver: bridge
+  internal-services:
+    name: internal-services
+    driver: bridge
