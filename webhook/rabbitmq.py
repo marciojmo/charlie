@@ -39,7 +39,7 @@ def get_rabbitmq_connection():
             connection.close()
 
 
-def publish_message(queue_id: str, message) -> None:
+def publish_message_to_exchange(exchange: str, message) -> None:
     """Publishes a message into a rabbitmq queue.
 
     Args:
@@ -52,18 +52,22 @@ def publish_message(queue_id: str, message) -> None:
     try:
         with get_rabbitmq_connection() as connection:
             channel = connection.channel()
-            channel.queue_declare(queue=queue_id, durable=True)
+            channel.exchange_declare(
+                exchange=exchange,
+                exchange_type='fanout',
+                durable=True
+            )
 
             channel.basic_publish(
-                exchange="",
-                routing_key=queue_id,
+                exchange=exchange,
+                routing_key='',  # fanout exchange ignores routing key
                 body=message.model_dump_json().encode("utf-8"),
                 properties=pika.BasicProperties(
                     delivery_mode=2,  # make message persistent
                 ),
             )
 
-            logger.info(f"Published message to '{queue_id}': {message}")
+            logger.info(f"Published message to exchange'{exchange}': {message}")
     except Exception as e:
         logger.error(f"Failed to publish message: {e}")
         raise

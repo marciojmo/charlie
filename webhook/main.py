@@ -65,7 +65,7 @@ async def evolution_webhook(request: fastapi.Request) -> None:
         )
 
         logger.info(f"Enqueuing new message: {message}")
-        rabbitmq.publish_message(settings.RABBITMQ_INCOMING_MESSAGES_QUEUE, message)
+        rabbitmq.publish_message_to_exchange(settings.RABBITMQ_INCOMING_MESSAGES_EXCHANGE, message)
 
     except ValueError as e:
         logger.error(f"Invalid request data: {e}")
