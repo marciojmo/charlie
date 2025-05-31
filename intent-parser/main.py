@@ -28,6 +28,7 @@ def start_consumer() -> None:
                 channel.queue_declare(
                     queue=settings.RABBITMQ_INCOMING_MESSAGES_QUEUE, durable=True
                 )
+                channel.queue_bind(exchange=settings.RABBITMQ_INCOMING_MESSAGES_EXCHANGE, queue=settings.RABBITMQ_INCOMING_MESSAGES_QUEUE)
 
                 logger.info(
                     f"[*] Listening on queue: {settings.RABBITMQ_INCOMING_MESSAGES_QUEUE}"
